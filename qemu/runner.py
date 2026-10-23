@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Portable QEMU runner. Smoke boots our static Mach-O, NOT the iOS userland.
 
-python qemu/runner.py --qemu PATH --firmware PATH [--mode smoke|apfs-smoke|ios]
+python qemu/runner.py --qemu PATH --firmware PATH [--mode smoke|apfs-smoke|exec-probe|ios]
 All writable artifacts go into a new out/qemu-* directory; no physical disks are used.
 """
 import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ PAYLOAD_LIMIT = 64 << 20
 BOOT_GRACE_SECONDS = 40
 SMOKE_MARKERS = ("Hello from user space on Darwin!", "I am process 1, uid 0")
 APFS_SMOKE_MARKER = 'apfs: volume 0 "Smoke" of container 0'
+EXEC_FAILURE = re.compile(r"load_init_program: failed loading /sbin/launchd: errno (\d+)")
 
 
 def default_loader():
@@ -72,8 +74,8 @@ def check_memory(memory_gib, system_size=0):
         raise ValueError("system image does not fit guest RAM; increase --memory-gib")
 
 
-def build_command(qemu, firmware, mode, memory_gib, cpus, display, system=None):
-    command = [str(qemu), "-M", "virt,gic-version=3", "-cpu", "cortex-a76",
+def build_command(qemu, firmware, mode, memory_gib, cpus, display, system=None, cpu="cortex-a76"):
+    command = [str(qemu), "-M", "virt,gic-version=3", "-cpu", cpu,
                "-accel", "tcg,tb-size=128", "-smp", str(cpus), "-m", f"{memory_gib}G",
                "-bios", str(firmware), "-drive", "file=fat:rw:esp,format=raw,if=virtio",
                "-device", f"loader,file=payload.bin,addr={PAYLOAD_BASE:#x},force-raw=on",
@@ -91,6 +93,11 @@ def build_command(qemu, firmware, mode, memory_gib, cpus, display, system=None):
 
 
 def verdict(mode, text, returncode, timed_out):
+    if mode == "exec-probe":
+        failure = EXEC_FAILURE.search(text)
+        if failure:
+            return "exec_rejected_bad_arch" if int(failure[1]) == 86 else f"exec_rejected_errno_{failure[1]}"
+        return "exec_probe_inconclusive"
     if mode != "ios":
         markers = SMOKE_MARKERS + ((APFS_SMOKE_MARKER,) if mode == "apfs-smoke" else ())
         if all(marker in text for marker in markers):
@@ -103,7 +110,7 @@ def verdict(mode, text, returncode, timed_out):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("smoke", "apfs-smoke", "ios"), default="smoke")
+    parser.add_argument("--mode", choices=("smoke", "apfs-smoke", "exec-probe", "ios"), default="smoke")
     parser.add_argument("--qemu", default=os.environ.get("QEMU_BIN", "qemu-system-aarch64"))
     parser.add_argument("--firmware", required=True, type=Path)
     parser.add_argument("--kernel", type=Path, default=ROOT / "prebuilt/mach.development.bcm2837")
@@ -112,6 +119,8 @@ def main(argv=None):
     parser.add_argument("--system-image", type=Path, help="iOS mode only: system.apfs from local IPSW")
     parser.add_argument("--memory-gib", type=int, help="guest virtual RAM: smoke=3, ios=7")
     parser.add_argument("--cpus", type=int, default=1)
+    parser.add_argument("--cpu", choices=("cortex-a76", "max"), default="cortex-a76",
+                        help="max exposes emulated CPU extensions; it does not implement an Apple ABI")
     parser.add_argument("--seconds", type=int, default=120)
     parser.add_argument("--display", choices=("none", "gtk", "sdl"), default="none")
     args = parser.parse_args(argv)
@@ -120,6 +129,8 @@ def main(argv=None):
             raise ValueError("--seconds must be 1..3600; --cpus must be 1..8")
         if args.mode != "ios" and args.system_image:
             raise ValueError("--system-image is only valid in iOS mode")
+        if args.mode == "exec-probe" and args.ramdisk is None:
+            raise ValueError("exec-probe requires an explicit prepared --ramdisk APFS image")
         qemu = shutil.which(str(args.qemu))
         if qemu is None:
             raise ValueError(f"QEMU executable not found: {args.qemu}")
@@ -155,7 +166,7 @@ def main(argv=None):
     subprocess.run(payload, check=True, timeout=30)
     if (session / "payload.bin").stat().st_size > PAYLOAD_LIMIT:
         raise ValueError("packed payload exceeds the loader's 64 MiB area")
-    command = build_command(qemu, firmware, args.mode, memory_gib, args.cpus, args.display, system)
+    command = build_command(qemu, firmware, args.mode, memory_gib, args.cpus, args.display, system, args.cpu)
     report = {"mode": args.mode, "backend": "qemu-tcg", "qemu_version": version,
               "command": command, "bootargs": bootargs, "inputs": {},
               "ios_ui_validated": False, "gpu_acceleration_validated": False}
@@ -177,6 +188,9 @@ def main(argv=None):
     report.update(elapsed_seconds=round(time.monotonic() - started, 3),
                   returncode=returncode, timed_out=timed_out,
                   verdict=verdict(args.mode, text, returncode, timed_out))
+    failure = EXEC_FAILURE.search(text)
+    if args.mode == "exec-probe":
+        report["exec_errno"] = int(failure[1]) if failure else None
     (session / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"{report['verdict']}: {session}")
     return 0 if report["verdict"] in ("smoke_userspace_pass", "session_completed") else 1

@@ -6,6 +6,8 @@ Branch `research/portability-baseline` adds regression tests, a portable Python 
 The Windows QEMU smoke test executes the project's static Mach-O as PID 1 on XNU; it is not an iOS UI test.
 It does **not** add phone drivers or iOS 27 support. The paired userland branch fixes prebuilt image staging.
 See [portable QEMU usage](docs/QEMU.ru.md).
+The [iOS 27 preparation path](docs/IOS27.ru.md) downloads and inspects real RecoveryOS components;
+the exec probe currently confirms an ARM64e_X1 rejection, not a working iOS 27 boot.
 See [the research report and implementation plan](docs/RESEARCH.ru.md) and
 [validation results and reproduction commands](docs/VALIDATION.ru.md).
 

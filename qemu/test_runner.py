@@ -67,6 +67,12 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(runner.verdict("ios", "", 0, False), "session_completed")
         self.assertEqual(runner.verdict("smoke", "\n".join(runner.SMOKE_MARKERS), None, True), "smoke_userspace_pass")
 
+    def test_exec_probe_reports_the_real_kernel_error_not_success(self):
+        text = "load_init_program: failed loading /sbin/launchd: errno 86"
+        self.assertEqual(runner.verdict("exec-probe", text, 0, False), "exec_rejected_bad_arch")
+        self.assertEqual(runner.verdict("exec-probe", text.replace("86", "2"), 0, False), "exec_rejected_errno_2")
+        self.assertEqual(runner.verdict("exec-probe", "SpringBoard", 0, False), "exec_probe_inconclusive")
+
     def test_command_is_headless_offline_and_uses_no_host_devices(self):
         command = runner.build_command("qemu", Path("firmware with space.fd"), "smoke", 3, 1, "none")
         self.assertIn("firmware with space.fd", command)
@@ -81,6 +87,10 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("virtio-tablet-device", command)
         with self.assertRaises(ValueError):
             runner.build_command("qemu", Path("efi"), "ios", 7, 4, "none")
+
+    def test_cpu_extensions_are_an_explicit_emulator_choice(self):
+        command = runner.build_command("qemu", Path("efi"), "smoke", 3, 1, "none", cpu="max")
+        self.assertEqual(command[command.index("-cpu") + 1], "max")
 
     def test_missing_and_empty_input_rejected(self):
         with tempfile.TemporaryDirectory() as folder:

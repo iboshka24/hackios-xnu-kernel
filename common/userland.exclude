@@ -4,6 +4,7 @@
 /*
 !/userland/
 !/ios165/
+!/ios27/
 !/prebuilt/
 !/tools/
 !/docs/
@@ -41,3 +42,7 @@ __pycache__/
 /ios165/*
 !/ios165/fetch.sh
 !/ios165/*.py
+
+/ios27/*
+!/ios27/*.py
+!/ios27/target.json

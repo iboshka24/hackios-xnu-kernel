@@ -6,7 +6,7 @@
 GNU timeout, sparse-файла на 12 GB и `copy_file_range`. Используются настоящий
 UEFI loader, настоящее XNU и статическая Mach-O программа проекта.
 
-Три режима:
+Четыре режима:
 
 - **smoke**: `prebuilt/userland/hello` становится `/sbin/launchd` через mockfs,
   выполняет системные вызовы и печатает PID/UID. Apple userland не нужен.
@@ -14,6 +14,9 @@ UEFI loader, настоящее XNU и статическая Mach-O прогр�
   container посредством имеющегося `tools/apfs/mkapfs.py`. Manifest задаёт
   Unix permissions независимо от Windows filesystem. Для pass дополнительно
   требуется строка kernel log о монтировании тома `Smoke`.
+- **exec-probe**: принимает явно заданный APFS image и сохраняет реальную
+  ошибку exec PID 1, включая `exec_rejected_bad_arch` для errno 86. Не объявляет
+  image загруженной iOS при нулевом коде самого QEMU; подробнее в [IOS27.ru.md](IOS27.ru.md).
 - **ios**: подключаются настоящие локальные `root.apfs` и `system.apfs`.
   Сам runner их не генерирует и не подменяет имитацией SpringBoard.
   Этот режим в данной итерации не запускался.
@@ -167,11 +170,12 @@ $linker = 'C:\Users\ibrohim\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib
 & $python -m unittest discover -s qemu -p test_runner.py -v
 ```
 
-Итог проверки этой итерации: **11 Python tests**, **13 shell regressions**,
+Итог второй итерации: **11 Python tests**, **13 shell regressions**,
 **6 сценариев DMA/mode validation** проходят. Loader также отдельно
 скомпилирован с `-Wall -Wextra -Werror -Wno-unused-parameter`.
 Проверка APFS builder использует синтетические bytes и сравнивает два независимо
 построенных образа; выполнение собственного Mach-O подтверждено отдельным QEMU boot.
+Новые iOS 27 проверки и exec-probe описаны отдельно в [IOS27.ru.md](IOS27.ru.md).
 
 Zig archive: `https://ziglang.org/download/0.17.0/zig-x86_64-windows-0.17.0.zip`,
 проверенный SHA256:
