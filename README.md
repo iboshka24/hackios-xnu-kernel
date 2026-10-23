@@ -1,5 +1,12 @@
 # HackiOS — XNU kernel
 
+## Research fork: portability baseline
+
+Branch `research/portability-baseline` adds host-only regression tests and propagates image/emulator failures.
+It does **not** add device drivers or iOS 27 support. The paired userland branch fixes prebuilt image staging.
+See [the research report and implementation plan](docs/RESEARCH.ru.md) and
+[validation results and reproduction commands](docs/VALIDATION.ru.md).
+
 **HackiOS** boots Apple's open-source **XNU kernel** (`xnu-8796.121.2`, the kernel of iOS 16.5) on Android phone
 hardware and runs the **unmodified iOS 16.5 user space** on top of it: launchd → backboardd → SpringBoard →
 apps. Our own EFI loader, our own replacements for Apple's closed drivers, a UEFI port, and a Linux Wi-Fi driver

@@ -7,6 +7,7 @@
 #
 # Nothing is flashed: on a phone everything lives in RAM and `./xl reboot` (or a power-key reset)
 # brings back Android. The session's log is printed (QEMU) or saved in logs/ (phones).
+set -o pipefail
 . "$(dirname "$(readlink -f "$0")")/lib.sh"
 load_device "$1"
 SECS=${2:-$DEFAULT_SECS}
