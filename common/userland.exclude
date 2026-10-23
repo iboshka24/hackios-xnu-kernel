@@ -45,4 +45,4 @@ __pycache__/
 
 /ios27/*
 !/ios27/*.py
-!/ios27/target.json
+!/ios27/target*.json

@@ -154,3 +154,63 @@ SystemVersion и реальная сборка APFS на синтетическ�
    пройти launchd -> backboardd -> SpringBoard с отдельной проверкой IOKit/Metal API.
 
 Ни один из этих трёх пунктов не помечен реализованным этим preparation commit.
+
+## Найденный опубликованный путь и проверка более старого устройства
+
+Проверен исходный код [Lakr233/vphone-cli](https://github.com/Lakr233/vphone-cli)
+на commit `2279ecb313d6607310755a66dce7f7c9a82e51a7` от 23.10.2026.
+В [матрице совместимости](https://github.com/Lakr233/vphone-cli/blob/2279ecb313d6607310755a66dce7f7c9a82e51a7/Documents/Guides/compatibility.md)
+авторы фиксируют успешную загрузку **iPhone19,2 / 27.0.1 / 24A446** на M5 Max
+с cloudOS 26.4 `23E5207q`: Settings, Safari и Calculator запускаются.
+Это опубликованный результат авторов, не локальный boot на нашем Windows.
+
+Реализация состоит не из одного изменения subtype:
+
+- `KernelCustomFirmwarePatchArm64eX1.swift`: grading, exec PAC и authenticated shared-region gates.
+- `VPhoneArm64eX1Lowering.swift`: PAuth_LR -> SP-only forms, CPA -> обычная арифметика.
+- `CustomFirmwareArm64eX1.swift`: обход кода bootstrap closure и учёт непосещённых кандидатов.
+- Статическая обработка dyld/launchd, 38 cache images и runtime exception service.
+
+Базовое ядро vphone600 уже поддерживает обычный ARM64e. Lowering уменьшает
+PC-bound PAC/CPA гарантии и не воспроизводит аппаратную защиту X1.
+Версию 27.1 подставлять нельзя: у авторов есть отдельный неудачный Duo bring-up
+с неподдержанными CSSC instructions.
+
+[Host requirements](https://github.com/Lakr233/vphone-cli/blob/2279ecb313d6607310755a66dce7f7c9a82e51a7/Documents/Guides/host-setup.md):
+Apple Silicon Mac, macOS 15+, Virtualization.framework и research-guest admission.
+Nested macOS VM не поддерживается. В нашем Windows QEMU 11.1 отсутствует vmapple
+machine; запуск Mac-only vphone-cli здесь не подтверждён и не заявляется.
+Настройки SIP, AMFI и NVRAM текущей машины не менялись.
+
+Команда документированного Mac backend после успешного host preflight:
+
+```bash
+vphone-cli host preflight
+vphone-cli vm create ios27 \
+  --iphone-source 'https://updates.cdn-apple.com/2026FallFCS/8cd333d4-1025-4e89-99a2-1373d2b5bfcb/iPhone19,2_27.0.1_24A446_Restore.ipsw' \
+  --cloudos-source 'https://updates.cdn-apple.com/private-cloud-compute/c0ecdb4b310cf5239ab2b248dd3098eec297dc5aa3bbe6ada27273262b0b8b64'
+vphone-cli vm launch ios27
+```
+
+### Локальная проверка iPhone 12 вместо X1
+
+Добавлен `ios27/target-iphone12.json`: `iPhone13,2`, `d53gap`, тот же build 24A446.
+У него в проверенном IPSW нет RecoveryOS identity. Поэтому извлечён **RestoreRamDisk**
+`043-69915-784.dmg`, 243 269 659 bytes, распакован IM4P и проверен SystemVersion:
+`27.0.1`, `24A446`, `ReleaseType=Restore`.
+
+Оба настоящих launchd/dyld имеют обычный `arm64e`, subtype `0x80000002`, без X1.
+Их APFS probe **тоже отклонён нынешним XNU с errno 86**
+(`out/qemu-exec-probe-iew9jm_6/report.json`). Следовательно, X1 не единственный
+барьер: переход на более старый iPhone не заменяет ARM64e kernel support.
+Это сужает направление работ до PAC-capable kernel baseline либо явной реализации
+ARM64e ABI, а не ещё одной замены имени устройства.
+
+```powershell
+& $python ios27/fetch.py --target ios27/target-iphone12.json --identity 0 --component RestoreRamDisk --output ios27/artifacts/iphone12
+& $python ios27/prepare.py --target ios27/target-iphone12.json --component RestoreRamDisk --cache ios27/artifacts/iphone12 --ipsw-tool "$tools\ipsw\ipsw.exe" --sevenzip "$tools\7zip\7z.exe"
+```
+
+Обычный ARM64 smoke с `-cpu max` проходит, тогда как оба Apple ARM64e probes
+отклонены. UniXNU `1a01c2afa197d975d04da892325c56b6b14aaecb` также описывает
+такой `EBADARCH` на Surface Duo 2 и не содержит готового решения X1 для нашей базы.
