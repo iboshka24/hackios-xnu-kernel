@@ -1,8 +1,11 @@
 # Проверка portability baseline
 
+Этот документ фиксирует первую host-only итерацию. Реальные QEMU результаты
+следующей итерации и текущие команды запуска — в [QEMU.ru.md](QEMU.ru.md).
+
 ## Выполнено локально
 
-Host: Windows, Git for Windows Bash. Доступны Git и GitHub CLI. `common/setup.sh`
+Первоначальный host: Windows, Git for Windows Bash. Доступны Git и GitHub CLI. `common/setup.sh`
 собрал объединённое рабочее дерево двух репозиториев. Доступная WSL-команда
 не предоставила работающий Linux-дистрибутив. QEMU, gcc, clang/lld-link, adb,
 fastboot и iPhoneOS16.5 SDK в проверенном PATH/стандартном месте отсутствуют.

@@ -2,6 +2,10 @@
 
 Дата проверки публичных материалов: **23 октября 2026**.
 
+Дополнение второй итерации: [QEMU.ru.md](QEMU.ru.md) — реальная загрузка XNU
+под Windows, три cold boots, собранный loader и исправление ramfb. Ниже сохранён
+исходный анализ; его первоначальный блокер «QEMU отсутствует» теперь снят для smoke.
+
 **Результат этой итерации — два форка, исправления сборочных скриптов и проверенный
 host-only стенд. Универсальный порт, новые GPU-драйверы и загрузка iOS 27 не реализованы.**
 
@@ -231,7 +235,7 @@ RAM-only режим не должен включать `ufs_write=1`, `var_store
 | Этап | Работа | Условие приёмки | Статус |
 |---|---|---|---|
 | P0 | Два форка, воспроизводимые wrapper/staging ошибки, минимальные исправления | 13 host tests проходят; diff не содержит IPSW/SDK/firmware | Выполнено |
-| P1 | Linux стенд и iOS 16.5 baseline; отдельно проверить ramfb/timeout PR | Три холодных boot, SpringBoard screenshot, управляемый ввод, crash log | Заблокировано отсутствием Linux/QEMU |
+| P1 | Стенд и iOS 16.5 baseline; отдельно проверить ramfb/timeout PR | Три холодных boot, SpringBoard screenshot, управляемый ввод, crash log | XNU smoke: 3/3 в Windows QEMU; iOS UI ещё не проверен |
 | P2 | GPU census с реальными входами, fences и reference readback | Manifest корпуса + результаты каждой стадии, ни один skip не назван pass | Не начато |
 | P3 | Metal runtime: реально используемые незакрытые API, stitching, presentation | Минимальное приложение и системный compositor проходят один набор pixel tests | Не начато |
 | P4 | Второй Qualcomm board с измеренным DTB, firmware и SMMU | Loader -> kernel -> input/framebuffer -> UI; затем GPU/net/audio по отдельности | Нет DTB и hardware run |

@@ -14,7 +14,9 @@ EFI=${QEMU_EFI:-/usr/share/edk2/aarch64/QEMU_EFI.fd}
 cp "${QEMU_VARS:-/usr/share/edk2/aarch64/QEMU_VARS.fd}" vars.fd 2>/dev/null
 # the loader is the boot application of the little FAT volume QEMU makes of esp/:
 # the one built here, or else the one that comes with the repository
-L=../xnuloader/loader.efi; [ -f $L ] || L=../prebuilt/loader.efi
+L=../xnuloader/loader.efi
+[ -f $L ] || L=../prebuilt/loader-qemu.efi
+[ -f $L ] || L=../prebuilt/loader.efi
 mkdir -p esp/EFI/BOOT && cp -u $L esp/EFI/BOOT/BOOTAA64.EFI
 timeout "$T" qemu-system-aarch64 -M virt,gic-version=3 -cpu cortex-a76 -smp ${QEMU_SMP:-1} -m ${QEMU_MEM:-6G} \
   -accel tcg,tb-size=${QEMU_TB_MB:-384} \

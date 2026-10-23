@@ -2,8 +2,10 @@
 
 ## Research fork: portability baseline
 
-Branch `research/portability-baseline` adds host-only regression tests and propagates image/emulator failures.
-It does **not** add device drivers or iOS 27 support. The paired userland branch fixes prebuilt image staging.
+Branch `research/portability-baseline` adds regression tests, a portable Python QEMU runner and a ramfb/DMA fix.
+The Windows QEMU smoke test executes the project's static Mach-O as PID 1 on XNU; it is not an iOS UI test.
+It does **not** add phone drivers or iOS 27 support. The paired userland branch fixes prebuilt image staging.
+See [portable QEMU usage](docs/QEMU.ru.md).
 See [the research report and implementation plan](docs/RESEARCH.ru.md) and
 [validation results and reproduction commands](docs/VALIDATION.ru.md).
 

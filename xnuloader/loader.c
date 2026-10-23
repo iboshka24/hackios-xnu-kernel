@@ -11,6 +11,7 @@
  */
 #include "efi.h"
 #include "identity.h"         /* who iOS shall think we are: from the iPhone's own device tree (mkidentity.py) */
+#include "ramfb.h"
 
 /* ------------------------------------------------------------------------ */
 /* Fixed conventions shared with the boot shim, the packer and the kernel   */
@@ -3838,14 +3839,12 @@ usb_command_loop(void)
 /* ------------------------------------------------------------------------ */
 
 /*
- * QEMU's "ramfb" display shows whatever guest memory it is told to, in any size; the firmware
+ * QEMU's "ramfb" display shows guest memory within its supported mode limits; the firmware
  * only offers a few small landscape modes of it. So we point it at memory of our own with the
  * shape of the iPhone's screen, through the fw_cfg file "etc/ramfb" (the firmware's own mode
  * is simply replaced). In QEMU the display is then exactly what iOS expects; on the real phone
  * the kernel's display driver scales that picture to the panel.
  */
-#define PHONE_WIDTH     1125            /* the screen of the iPhone X, whose identity we carry */
-#define PHONE_HEIGHT    2436
 #define FW_CFG_BASE     0x09020000ULL   /* QEMU virt: data at +0, selector at +8, DMA address at +16 */
 #define FW_CFG_FILE_DIR 0x19
 #define FW_CFG_DMA_SELECT 0x08
@@ -3866,6 +3865,12 @@ fw_cfg_read(void *buf, uint32_t len)
 }
 
 static void
+ramfb_stall(uint32_t microseconds)
+{
+	BS->stall(microseconds);
+}
+
+static void
 ramfb_phone_screen(void)
 {
 	static struct {
@@ -3873,7 +3878,8 @@ ramfb_phone_screen(void)
 		uint32_t fourcc, flags, width, height, stride;
 	} __attribute__((packed)) cfg;
 	static struct {
-		uint32_t control, length;
+		volatile uint32_t control;
+		uint32_t length;
 		uint64_t address;
 	} dma;
 	struct {
@@ -3882,7 +3888,7 @@ ramfb_phone_screen(void)
 		char name[56];
 	} file;
 	uint32_t count, select = 0;
-	uint64_t fb = 0, bytes = (uint64_t)PHONE_WIDTH * 4 * PHONE_HEIGHT;
+	uint64_t fb = 0, bytes = (uint64_t)RAMFB_WIDTH * 4 * RAMFB_HEIGHT;
 
 	*(volatile uint16_t *)(FW_CFG_BASE + 8) = __builtin_bswap16(FW_CFG_FILE_DIR);
 	fw_cfg_read(&count, sizeof(count));
@@ -3900,21 +3906,23 @@ ramfb_phone_screen(void)
 	cfg.addr = __builtin_bswap64(fb);
 	cfg.fourcc = be32(0x34325258);          /* 'XR24': blue, green, red, unused */
 	cfg.flags = 0;
-	cfg.width = be32(PHONE_WIDTH);
-	cfg.height = be32(PHONE_HEIGHT);
-	cfg.stride = be32(PHONE_WIDTH * 4);
+	cfg.width = be32(RAMFB_WIDTH);
+	cfg.height = be32(RAMFB_HEIGHT);
+	cfg.stride = be32(RAMFB_WIDTH * 4);
 	dma.control = be32(select << 16 | FW_CFG_DMA_SELECT | FW_CFG_DMA_WRITE);
 	dma.length = be32(sizeof(cfg));
 	dma.address = __builtin_bswap64((uint64_t)(uintptr_t)&cfg);
+	__asm__ volatile ("dsb sy" ::: "memory");
 	*(volatile uint64_t *)(FW_CFG_BASE + 16) = __builtin_bswap64((uint64_t)(uintptr_t)&dma);
-	if (dma.control != 0) {
-		print("ramfb: control %x after the request\n", (uint64_t)be32(dma.control));
+	uint32_t status = ramfb_wait_dma(&dma.control, ramfb_stall);
+	if (status != 0) {
+		print("ramfb: DMA %s, control %x\n", (status & RAMFB_DMA_ERROR) ? "error" : "timeout", (uint64_t)status);
 		return;
 	}
 	SCREEN.base = fb;
-	SCREEN.width = PHONE_WIDTH;
-	SCREEN.height = PHONE_HEIGHT;
-	SCREEN.stride = PHONE_WIDTH * 4;
+	SCREEN.width = RAMFB_WIDTH;
+	SCREEN.height = RAMFB_HEIGHT;
+	SCREEN.stride = RAMFB_WIDTH * 4;
 }
 
 efi_status EFIAPI
