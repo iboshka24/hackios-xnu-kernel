@@ -214,3 +214,21 @@ ARM64e ABI, а не ещё одной замены имени устройств
 Обычный ARM64 smoke с `-cpu max` проходит, тогда как оба Apple ARM64e probes
 отклонены. UniXNU `1a01c2afa197d975d04da892325c56b6b14aaecb` также описывает
 такой `EBADARCH` на Surface Duo 2 и не содержит готового решения X1 для нашей базы.
+
+## Восстановленная функция из kernelcache iOS 27
+
+В `ios27/reconstructed/` userland-форка добавлена C-реконструкция функции оценки
+ARM64/ARM64e/X1. Имя `ml_grade_binary` установлено по соответствию публичному
+XNU и control flow; в исследованном бинарнике символ удалён.
+
+Восстановлено поведение **204 bytes / 51 instructions** по адресу
+`0xfffffe000b2936f8` в kernelcache 27.0.1. C-код собран в DLL и сравнен
+с исполнением неизменённых ARM64 bytes в Unicorn: **33 478 cases, 0 mismatches,
+51/51 instructions covered**. TPIDR_EL1 и прочитанная per-CPU память заданы harness.
+Это не проверка на реальном Apple CPU и не формальное доказательство на всех входах.
+
+Код и воспроизводимая процедура:
+[ios27/reconstructed](https://github.com/iboshka24/hackios-xnu-userland/tree/research/portability-baseline/ios27/reconstructed).
+Реальная assembly и результаты — локально в `out/reconstructed-ios27/`.
+Оригинальные исходники, остальные функции iOS и поддержка boot этим не восстановлены;
+модель не встроена в существующий XNU и не меняет его grading/PAC поведение.
