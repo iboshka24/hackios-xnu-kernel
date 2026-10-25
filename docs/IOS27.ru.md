@@ -232,3 +232,12 @@ XNU и control flow; в исследованном бинарнике симво
 Реальная assembly и результаты — локально в `out/reconstructed-ios27/`.
 Оригинальные исходники, остальные функции iOS и поддержка boot этим не восстановлены;
 модель не встроена в существующий XNU и не меняет его grading/PAC поведение.
+
+Следующим пакетом добавлен `ios27/reconstructed/dyld_macho.c`: поведение
+19 методов dyld-27062 (18 уникальных machine-code bodies) через три C entry points.
+Восстановлены примитивы Mach-O/архитектур и часть pointer-chain операций.
+Пройдено 133 298 дополнительных сравнений с исходными инструкциями без замен,
+0 расхождений, покрыты 190/190 инструкций выбранных методов.
+С предыдущей grading-функцией — 166 776 сравнений. Это не восстановление всего
+dyld, loader bootstrap или загрузка iOS. Процедура и ограничения —
+[DYLD_BATCH.md](https://github.com/iboshka24/hackios-xnu-userland/blob/research/portability-baseline/ios27/reconstructed/DYLD_BATCH.md).
